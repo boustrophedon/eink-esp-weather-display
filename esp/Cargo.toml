@@ -1,0 +1,36 @@
+[package]
+name = "esp-blinkytest"
+version = "0.1.0"
+authors = ["Harry Stern <harry@harrystern.net>"]
+edition = "2021"
+resolver = "2"
+rust-version = "1.66"
+
+[profile.release]
+opt-level = "s"
+
+[profile.dev]
+debug = true    # Symbols are nice and they don't increase the size on Flash
+opt-level = "z"
+
+[features]
+
+default = ["std", "esp-idf-sys/native", "experimental"]
+
+
+std = ["alloc", "esp-idf-sys/std", "esp-idf-sys/binstart", "embedded-svc/std", "esp-idf-hal/std", "esp-idf-svc/std"]
+alloc = ["embedded-svc/alloc", "esp-idf-hal/alloc", "esp-idf-svc/alloc"]
+experimental = ["embedded-svc/experimental", "esp-idf-svc/experimental"]
+
+[dependencies]
+anyhow = "*"
+log = { version = "0.4.17" }
+esp-idf-sys = { version = "0.33" }
+esp-idf-hal = { version = "0.41" }
+esp-idf-svc = { version = "0.46" }
+embedded-svc = { version = "0.25" }
+
+epd-waveshare = { git = "https://github.com/caemor/epd-waveshare", rev = "f22b6e2c33173" }
+
+[build-dependencies]
+embuild = "0.31.2"
