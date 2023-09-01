@@ -32,6 +32,7 @@ pub fn create_todoist_client(env_data: &EnvData) -> Client {
     let api_key = get_tasks_key(env_data);
     let bearer = format!("Bearer {api_key}");
 
+
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert("Content-Type", "application/json".parse().unwrap());
     headers.insert("Authorization", bearer.parse().unwrap());
@@ -43,7 +44,8 @@ pub fn create_todoist_client(env_data: &EnvData) -> Client {
 
 pub fn get_tasks(client: &Client) -> String {
     let json_str = client.get(TASKS_URL)
-        .query(&[("filter", "due before: +48 hours & due after: -24 hours")])
+        .query(&[("filter", "due before: +48 hours")])
+        //.query(&[("filter", "due before: +48 hours & due after: -24 hours")])
         .send()
         .expect("failed to make todoist tasks request")
         .text()
@@ -67,10 +69,15 @@ pub fn parse_tasks(json_str: &str) -> Vec<Task> {
             .parse()
             .expect("failed to parse due date");
 
-        output.push(Task {
-            description,
-            due_date
-        });
+        // remove when api 500 is fixed and just push always
+        let current_date = chrono::Utc::now().date_naive();
+        let offset = chrono::Duration::days(2);
+        if due_date > current_date - offset {
+            output.push(Task {
+                description,
+                due_date
+            });
+        }
     }
 
     output
