@@ -33,14 +33,14 @@ pub use draw::*;
 
 
 pub fn get_env_data() -> EnvData {
-    let file_path = get_input_path();
+    let file_path = get_envdata_filepath();
     EnvData::from_file(&file_path)
 }
 
-pub fn get_input_path() -> PathBuf {
+pub fn get_envdata_filepath() -> PathBuf {
     let path_str = std::env::args().nth(1)
         .expect("1st cli argument did not exist");
-    PathBuf::from(path_str) 
+    PathBuf::from(path_str)
 }
 
 pub fn get_output_path() -> PathBuf {
@@ -116,15 +116,19 @@ fn parse_data(tx: SyncSender<DisplayData>, current_weather_json: String, hourly_
 }
 
 fn main() {
+    if std::env::args().len() != 3 {
+        eprintln!("usage: halldisplay <env json filename> <output filename>");
+        return;
+    }
     let env_data = get_env_data();
-    let output_path = get_output_path();
+    let output_filepath = get_output_path();
 
     let font_data: &[u8] = include_bytes!("../fonts/Comfortaa-Regular.ttf");
     let font: Font<'static> = Font::try_from_bytes(font_data)
         .expect("failed to open font");
 
-    let mut output_data_file = File::create(&output_path).expect("failed to create file");
-    let mut output_image_file = File::create(&output_path.with_extension("png")).expect("failed to create file");
+    let mut output_data_file = File::create(&output_filepath).expect("failed to create file");
+    let mut output_image_file = File::create(&output_filepath.with_extension("png")).expect("failed to create file");
 
     let (json_sender, json_receiver) = sync_channel(1);
     let (data_sender, data_receiver) = sync_channel(1);
