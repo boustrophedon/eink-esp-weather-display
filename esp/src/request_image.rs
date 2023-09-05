@@ -44,6 +44,12 @@ fn get_data(client: &mut HttpClient<EspHttpConnection>, url: &str) -> anyhow::Re
     // Drain the remaining response bytes
     while body.read(&mut buf)? > 0 {}
 
+    if bytes_read == 0 {
+        anyhow::bail!("Image data body was empty");
+    }
+    if bytes_read != 96000 {
+        anyhow::bail!("Image data body was wrong size. Expected 96000, got {}", bytes_read);
+    }
     Ok(buf)
 }
 

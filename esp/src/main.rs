@@ -69,14 +69,19 @@ fn main() -> anyhow::Result<()> {
 
 
     log::info!("request image from server");
-    let image_data = request_image(IMAGE_DATA_URL)?;
+    let image_result = request_image(IMAGE_DATA_URL);
 
     log::info!("turning off wifi");
     // turn off wifi
     drop(wifi);
+    if let Ok(image_data) = image_result {
+        log::info!("render image");
+        draw_epd(image_data, spi_driver, epd, delay)?;
+    }
+    else {
+        log::error!("getting image data failed: {:?}", image_result.unwrap_err());
+    }
 
-    log::info!("render image");
-    draw_epd(image_data, spi_driver, epd, delay)?;
     // deep sleep for 1.5 hours or on wakeup button press
     enter_deep_sleep(wakeup_pin.into(), Duration::from_secs(60*30*3));
 
