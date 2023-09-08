@@ -49,15 +49,14 @@ fn main() -> anyhow::Result<()> {
     log::info!("wakeup: {:?}", esp_idf_hal::reset::WakeupReason::get());
 
     let peripherals = Peripherals::take().unwrap();
-    let (led_pin, wakeup_pin, modem, spi_driver, epd, delay) =
+    let (_led_pin, wakeup_pin, modem, spi_driver, epd, delay) =
         gather_peripherals(peripherals)?;
     let sysloop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
 
 
-    disable_onboard_led(led_pin)?;
-
-
+    // see comment on function
+    //disable_onboard_led(led_pin)?;
 
     let wifi = wifi::wifi(
         WIFI_CONFIG_DATA.ssid,
@@ -82,8 +81,8 @@ fn main() -> anyhow::Result<()> {
         log::error!("getting image data failed: {:?}", image_result.unwrap_err());
     }
 
-    // deep sleep for 1.5 hours or on wakeup button press
-    enter_deep_sleep(wakeup_pin.into(), Duration::from_secs(60*30*3));
+    // deep sleep for 3 hours or on wakeup button press
+    enter_deep_sleep(wakeup_pin.into(), Duration::from_secs(60*60*3));
 
     unreachable!("in sleep");
 }
@@ -129,7 +128,9 @@ fn enter_deep_sleep(wakeup_pin: AnyInputPin, sleep_time: Duration) {
 
 /// Disable the onboard led during deep sleep
 /// TODO: measure current draw vs gpio_deep_sleep_hold_en
-fn disable_onboard_led(ledpin: gpio::Gpio2) -> anyhow::Result<()> {
+/// currently unused because i desoldered the leds, but I wanted to keep the function so I just
+/// made it pub
+pub fn disable_onboard_led(ledpin: gpio::Gpio2) -> anyhow::Result<()> {
     log::info!("disable onboard led");
     let mut led = PinDriver::output(ledpin)?;
     led.set_low()?;
