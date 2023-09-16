@@ -1,3 +1,6 @@
+/// Handles drawing the actual pixels onto a canvas
+/// See the `render` module for where these are called from
+
 use std::collections::HashMap;
 
 use chrono::prelude::*;

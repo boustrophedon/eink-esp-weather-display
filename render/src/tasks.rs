@@ -57,5 +57,6 @@ pub fn parse_tasks(json_str: &str) -> Vec<Task> {
         });
     }
 
+    output.sort_by_key(|t| t.due_date);
     output
 }
