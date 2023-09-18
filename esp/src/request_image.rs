@@ -22,12 +22,11 @@ fn create_client() -> anyhow::Result<HttpClient<EspHttpConnection>> {
     Ok(HttpClient::wrap(EspHttpConnection::new(&config)?))
 }
 
+// This code is mostly taken from some sample code somewhere
 fn get_data(client: &mut HttpClient<EspHttpConnection>, url: &str) -> anyhow::Result<Vec<u8>> {
-
     let headers = [("accept", "application/octet-stream"), ("connection", "close")];
-
-	let request = client.request(Method::Get, &url, &headers)?;
-    info!("-> GET {}", url);
+    let request = client.request(Method::Get, &url, &headers)?;
+    info!("making request {}", url);
     let mut response = request.submit()?;
 
     // Process response
@@ -36,19 +35,22 @@ fn get_data(client: &mut HttpClient<EspHttpConnection>, url: &str) -> anyhow::Re
     if status != 200 {
         anyhow::bail!("response status was not 200: {}", status);
     }
+
+    let buffer_size = crate::get_buffer_size();
     let (_headers, mut body) = response.split();
-    let mut buf = vec![0u8; 96000];
+    let mut buf = vec![0u8; buffer_size];
     let bytes_read = io::try_read_full(&mut body, &mut buf).map_err(|e| e.0)?;
     info!("Read {} bytes", bytes_read);
 
     // Drain the remaining response bytes
+    // TODO: probably should error here since we should get exactly the buffer size
     while body.read(&mut buf)? > 0 {}
 
     if bytes_read == 0 {
         anyhow::bail!("Image data body was empty");
     }
-    if bytes_read != 96000 {
-        anyhow::bail!("Image data body was wrong size. Expected 96000, got {}", bytes_read);
+    if bytes_read != buffer_size {
+        anyhow::bail!("Image data body was wrong size. Expected {}, got {}", buffer_size, bytes_read);
     }
     Ok(buf)
 }

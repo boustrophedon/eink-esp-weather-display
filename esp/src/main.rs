@@ -54,10 +54,10 @@ fn main() -> anyhow::Result<()> {
     let sysloop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
 
-
     // see comment on function
     //disable_onboard_led(led_pin)?;
 
+    // start wifi
     let wifi = wifi::wifi(
         WIFI_CONFIG_DATA.ssid,
         WIFI_CONFIG_DATA.psk,
@@ -66,13 +66,14 @@ fn main() -> anyhow::Result<()> {
         nvs,
     ).expect("failed to connect to wifi");
 
-
+    // get image
     log::info!("request image from server");
     let image_result = request_image(IMAGE_DATA_URL);
 
-    log::info!("turning off wifi");
     // turn off wifi
+    log::info!("turning off wifi");
     drop(wifi);
+
     if let Ok(image_data) = image_result {
         log::info!("render image");
         draw_epd(image_data, spi_driver, epd, delay)?;
@@ -81,8 +82,8 @@ fn main() -> anyhow::Result<()> {
         log::error!("getting image data failed: {:?}", image_result.unwrap_err());
     }
 
-    // deep sleep for 3 hours or on wakeup button press
-    enter_deep_sleep(wakeup_pin.into(), Duration::from_secs(60*60*3));
+    // deep sleep for 1.5 hours (or on wakeup button press)
+    enter_deep_sleep(wakeup_pin.into(), Duration::from_secs(60*30*3));
 
     unreachable!("in sleep");
 }
@@ -94,10 +95,10 @@ fn gather_peripherals(peripherals: Peripherals) -> anyhow::Result<(Gpio2, Gpio4,
 
     let modem = peripherals.modem;
 
-	let spi_p = peripherals.spi3;
-	let sclk: AnyOutputPin = pins.gpio13.into();
-	let sdo: AnyOutputPin = pins.gpio14.into();
-	let cs: AnyOutputPin = pins.gpio15.into();
+    let spi_p = peripherals.spi3;
+    let sclk: AnyOutputPin = pins.gpio13.into();
+    let sdo: AnyOutputPin = pins.gpio14.into();
+    let cs: AnyOutputPin = pins.gpio15.into();
     let busy_in: AnyInputPin = pins.gpio25.into();
     let rst: AnyOutputPin = pins.gpio26.into();
     let dc: AnyOutputPin = pins.gpio27.into();
@@ -116,8 +117,8 @@ fn enter_deep_sleep(wakeup_pin: AnyInputPin, sleep_time: Duration) {
         // TODO: measure current draw vs gpio_deep_sleep_hold_en
         //esp_idf_sys::rtc_gpio_hold_en(led.pin());
         //esp_idf_sys::gpio_deep_sleep_hold_en()
-        // TODO see if these need to be configured
-        //  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+        // TODO see if these need to be configured or if it makes a difference at all
+        // esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
         // esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
         // esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
         // esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL, ESP_PD_OPTION_OFF);
@@ -148,6 +149,7 @@ fn create_epd_driver(
     rst: AnyOutputPin,
     dc: AnyOutputPin,
     ) -> anyhow::Result<(SpiDev, EpdDriver, Delay)> {
+
     let mut driver = spi::SpiDeviceDriver::new_single(
         spi_p,
         sclk,
@@ -178,8 +180,17 @@ fn create_epd_driver(
     Ok((driver, epd_driver, delay))
 }
 
+/// Retuns the size of a buffer necessary to hold the entire image
+pub fn get_buffer_size() -> usize {
+    // The height is multiplied by 2 because the red pixels essentially exist on a separate "layer"
+    epd_waveshare::buffer_len(WIDTH as usize, HEIGHT as usize * 2)
+}
+
 fn draw_epd(mut buffer: Vec<u8>, mut driver: SpiDev, mut epd: EpdDriver, mut delay: Delay) -> anyhow::Result<()> {
-	let expected_len = epd_waveshare::buffer_len(WIDTH as usize, HEIGHT as usize * 2);
+    let expected_len = get_buffer_size();
+
+    // check that what we got from the server is actually the same size as when me make a
+    // epd_waveshare buffer of size WIDTH*HEIGHT pixels
     let buffer_len = buffer.len();
     if buffer_len != expected_len {
         anyhow::bail!("buffer len expected {}, got {}", expected_len, buffer_len);

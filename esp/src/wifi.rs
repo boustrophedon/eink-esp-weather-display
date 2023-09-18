@@ -13,10 +13,6 @@ use log::info;
 use std::time::Duration;
 // use std::net::Ipv4Addr;
 
-// NB to turn off wifi
-// wifi.stop()
-// drop(wifi)
-// maybe just drop will work?
 
 pub struct WifiConfig {
     pub ssid: &'static str,
