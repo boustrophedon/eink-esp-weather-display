@@ -1,0 +1,9 @@
+[Unit]
+Description=Update esp weather display render
+
+[Service]
+WorkingDirectory=~
+NoNewPrivileges=yes
+RestrictNamespaces=yes
+Type=oneshot
+ExecStart=.local/bin/halldisplay .config/halldisplay/env_data.json <OUTPUT_FILE>

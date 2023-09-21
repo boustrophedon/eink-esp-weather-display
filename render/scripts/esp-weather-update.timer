@@ -1,0 +1,10 @@
+[Unit]
+Description=Runs halldisplay renderer every hour
+
+[Timer]
+OnCalendar=*:00:00
+RandomizedDelaySec=2m
+Unit=esp-weather-update.service
+
+[Install]
+WantedBy=timers.target
