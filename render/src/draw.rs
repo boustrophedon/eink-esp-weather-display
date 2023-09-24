@@ -59,25 +59,25 @@ pub fn measure_text(font: &Font, text: &str, font_size: f32) -> (f32, f32) {
     let font_size = Scale::uniform(font_size);
     let v_metrics = font.v_metrics(font_size);
 
-	let xpad = 0f32;
-	let ypad = 0f32;
+    let xpad = 0f32;
+    let ypad = 0f32;
 
     let glyphs: Vec<_> = font
         .layout(text, font_size, point(xpad, ypad + v_metrics.ascent))
         .collect();
 
     let height = (v_metrics.ascent - v_metrics.descent).ceil();
-	let width = {
-		let min_x = glyphs
-			.first()
-			.map(|g| g.pixel_bounding_box().unwrap().min.x)
-			.unwrap();
-		let max_x = glyphs
-			.last()
-			.map(|g| g.pixel_bounding_box().unwrap().max.x)
-			.unwrap();
-		(max_x - min_x) as f32
-	};
+    let width = {
+            let min_x = glyphs
+                    .first()
+                    .map(|g| g.pixel_bounding_box().unwrap().min.x)
+                    .unwrap();
+            let max_x = glyphs
+                    .last()
+                    .map(|g| g.pixel_bounding_box().unwrap().max.x)
+                    .unwrap();
+            (max_x - min_x) as f32
+    };
 
     (width, height)
 }
@@ -128,6 +128,11 @@ pub fn draw_5day_graph(forecast: &[(DateTime<FixedOffset>, i32, u64)], width: i6
     let mut rain_points = Vec::new();
     let mut temp_points = Vec::new();
     let mut x = 0f32;
+
+    // compute the pixel y coordinate for each graph's data points based on the total height of the graph region
+    // the points are computed by scaling each point relative to the overall height, and for the
+    // temperature graph, the min and max temperature. the rain precipitation is a % so we just
+    // scale from 0 to 100. there's a bit of tricky off by one stuff as well.
     for (d, temp, rain_p) in forecast {
         let rain_y: f32 = height - ((*rain_p as f32 / 100.0)*(height-1.0)).floor() - 1.0;
 
