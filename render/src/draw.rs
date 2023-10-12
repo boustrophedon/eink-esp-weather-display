@@ -5,9 +5,9 @@ use crate::Forecast5Day;
 
 use chrono::prelude::*;
 
-use imageproc::drawing::{Canvas, draw_text_mut, draw_line_segment_mut, BresenhamLineIter};
-use image::{RgbImage, Rgb, Pixel};
-use image::imageops::ColorMap;
+use crate::text::draw_text_mut;
+use imageproc::drawing::{Canvas, draw_line_segment_mut, BresenhamLineIter};
+use image::{RgbImage, Rgb};
 use rusttype::{point, Font, Scale};
 
 
@@ -190,52 +190,4 @@ pub fn draw_text_bottom_right(image: &mut RgbImage, text: &str, x: f32, y: f32, 
     let scale = Scale::uniform(scale);
 
     draw_text_mut(image, color, (x-text_width) as i32, (y-text_height) as i32, scale, &font, &text);
-}
-
-
-/// Dither for 3 color display. Used for turning antialiased text to a solid color than can be
-/// rendered on the 3 color display. Could be better.
-pub struct TriColorDither;
-
-impl ColorMap for TriColorDither {
-    type Color = Rgb<u8>;
-
-    #[inline(always)]
-    fn index_of(&self, color: &Rgb<u8>) -> usize {
-        let l = color.to_luma().0[0];
-        let c = color.0;
-        // check for red
-        if c[0] > 250 && c[1] < 210 && c[2] < 210 {
-            return 2;
-        }
-
-        if l < 250 {
-            return 0;
-        }
-        else {
-            return 1;
-        }
-    }
-
-    #[inline(always)]
-    fn lookup(&self, idx: usize) -> Option<Self::Color> {
-        let white = Rgb([255u8, 255u8, 255u8]);
-        let black = Rgb([0u8, 0u8, 0u8]);
-        let red = Rgb([255u8, 0u8, 0u8]);
-        match idx {
-            0 => Some(black),
-            1 => Some(white),
-            2 => Some(red),
-            _ => Some(white),
-        }
-    }
-
-    fn has_lookup(&self) -> bool {
-        true
-    }
-
-    #[inline(always)]
-    fn map_color(&self, color: &mut Rgb<u8>) {
-        *color = self.lookup(self.index_of(color)).expect("color not found");
-    }
 }

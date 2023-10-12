@@ -20,6 +20,8 @@ pub use weather::*;
 mod tasks;
 pub use tasks::*;
 
+pub(crate) mod text;
+
 pub mod draw;
 pub use draw::*;
 

@@ -104,8 +104,6 @@ pub fn render(local_timezone: chrono_tz::Tz, display_data: DisplayData) -> (EInk
 
     image::imageops::overlay(&mut image, &fiveday, graph_x, graph_y);
 
-    image::imageops::colorops::dither(&mut image, &TriColorDither);
-
 
     let mut buffer = vec![TriColor::White.get_byte_value(); buffer_len(EPD_WIDTH as usize, 2 * EPD_HEIGHT as usize)];
     let mut display = VarDisplay::<TriColor>::new(EPD_WIDTH, EPD_HEIGHT, &mut buffer, false).expect("failed to create display");
@@ -158,5 +156,13 @@ mod tests {
 
         assert_eq!(buffer.len(), 96000);
         assert_eq!(image, read_image_data(gold_master));
+
+        let white = image::Rgb([255u8, 255u8, 255u8]);
+        let black = image::Rgb([0u8, 0u8, 0u8]);
+        let red = image::Rgb([255u8, 0u8, 0u8]);
+        let colors = [white, black, red];
+        for (x, y, p) in image.enumerate_pixels() {
+            assert!(colors.contains(p), "color at {x} {y} did not match: {p:#?}");
+        }
     }
 }
