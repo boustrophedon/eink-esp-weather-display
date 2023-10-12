@@ -1,4 +1,8 @@
-use chrono::{DateTime, FixedOffset};
+use std::collections::HashMap;
+
+use chrono::prelude::*;
+use chrono::Duration;
+//use chrono::{DateTime, FixedOffset};
 use reqwest::blocking::Client;
 use serde_json::Value;
 
@@ -9,7 +13,102 @@ const DAILY_FORECAST_URL: &'static str = "https://api.weather.gov/gridpoints/{of
 const HOURLY_FORECAST_URL: &'static str = "https://api.weather.gov/gridpoints/{office}/{gridpoint}/forecast/hourly";
 
 
-pub type AvgForecast = Vec<(DateTime<FixedOffset>, i32, u64)>;
+pub type FullForecast = Vec<(DateTime<FixedOffset>, i32, u64)>;
+pub type FilteredForecast = Vec<(DateTime<FixedOffset>, i32, u64)>;
+
+// number of data points to filter by (average rain probabilities etc)
+const CHUNK_SIZE: usize = 3;
+
+#[derive(Clone)]
+/// Forecast data for the next 5 days
+pub struct Forecast5Day {
+    pub full_forecast: FullForecast,
+}
+
+impl Forecast5Day {
+    pub fn new(hourly_forecast: &[ForecastPeriod]) -> Forecast5Day {
+        let mut full_forecast: FullForecast = Vec::new();
+
+        let start_dt = hourly_forecast[0].start_time;
+        let five_days = Duration::days(5);
+        for s in hourly_forecast {
+            if s.start_time - start_dt > five_days {
+                break;
+            }
+            full_forecast.push((s.start_time, s.temp_f, s.rain_prob));
+        }
+
+        // make sure forecast length is divisible by 3 for filtering later
+        let rem = full_forecast.len() % CHUNK_SIZE;
+        for _ in 0..rem { full_forecast.pop(); }
+
+        Forecast5Day {
+            full_forecast,
+        }
+    }
+
+    /// Returns weekly and daily temperatures as (min, max, dailyminmax)
+    /// Keys are simply the day of the month which will not overlap as long as the forecast is 5
+    /// days (i.e. less than a full month)
+    pub fn daily_minmax_temps(&self) -> HashMap<u32, (i32, i32)> {
+        let mut day_min: i32 = 200;
+        let mut day_max: i32 = -100;
+        let mut daily_minmax: HashMap<u32, (i32, i32)> = HashMap::new();
+
+        let mut current_day: u32 = self.full_forecast[0].0.day();
+        for (d, t, _) in &self.full_forecast {
+            let day = d.day();
+            let t = *t;
+
+            if day != current_day {
+                daily_minmax.insert(current_day, (day_min, day_max));
+                day_min = 200;
+                day_max = -100;
+                current_day = day;
+            }
+            if t < day_min && d.hour() > 12 {
+                day_min = t;
+            }
+            else if t > day_max {
+                day_max = t;
+            }
+        }
+        // below is commented to ignore update for the last day
+        // if day != current_day {
+        //     daily_minmax.insert(current_day, (day_min, day_max));
+        // }
+ 
+        daily_minmax
+    }
+
+    /// Returns min and max temps for the week
+    pub fn week_minmax_temps(&self) -> (i32, i32) {
+        let min_temp = self.full_forecast.iter()
+            .min_by_key(|(_, t, _)| t).expect("no values in forecast").1;
+        let max_temp = self.full_forecast.iter()
+            .max_by_key(|(_, t, _)| t).expect("no values in forecast").1;
+        (min_temp, max_temp)
+    }
+
+    /// Returns the temperature and rain data filtered to be smoother for drawing on a graph.
+    pub fn filtered_forecast(&self) -> FilteredForecast {
+        let mut forecast = Vec::new();
+
+        for c in self.full_forecast.chunks(CHUNK_SIZE) {
+            let len = c.len();
+            if len != CHUNK_SIZE {
+                panic!("forecast chunk size was not divisible by {CHUNK_SIZE}");
+            }
+            let start_time = c[1].0;
+            let temp = c[1].1;
+            let avg_precip = c.iter().map(|t| t.2).sum::<u64>()/len as u64;
+
+            forecast.push((start_time, temp, avg_precip));
+        }
+
+        forecast
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct CurrentWeather {
@@ -33,25 +132,32 @@ pub struct ForecastPeriod {
     pub long_desc: Option<String>,
 }
 
-/// returns vec of (start_hour, temperature, rain_probability)
-pub fn gather_5day_forecast(hourly_forecast: &[ForecastPeriod]) -> AvgForecast {
-    let mut output = Vec::new();
-
-    for s in hourly_forecast.chunks(4) {
-        let len = s.len();
-        let start_time = s[0].start_time;
-        let avg_temp = s.iter().map(|h| h.temp_f).sum::<i32>()/len as i32;
-        let avg_precip = s.iter().map(|h| h.rain_prob).sum::<u64>()/len as u64;
-
-        output.push((start_time, avg_temp, avg_precip));
-    }
-
-    let start = output[0].0;
-    let dt = chrono::Duration::days(5);
-    let output = output.into_iter().filter(|(d,_,_)| *d - start < dt);
-
-    return output.collect();
-}
+// deprecated in favor of Forecast5Day::filtered_forecast
+// /// returns two vecs of (start_hour, temperature, rain_probability)
+// pub(crate) fn gather_5day_forecast(hourly_forecast: &[ForecastPeriod]) -> (FullForecast, AvgForecast) {
+//     let mut avg_out = Vec::new();
+//     let mut full_out = Vec::new();
+// 
+//     for s in hourly_forecast {
+//         full_out.push((s.start_time, s.temp_f, s.rain_prob));
+//     }
+// 
+//     for s in hourly_forecast.chunks(4) {
+//         let len = s.len();
+//         let start_time = s[0].start_time;
+//         let avg_temp = s.iter().map(|h| h.temp_f).sum::<i32>()/len as i32;
+//         let avg_precip = s.iter().map(|h| h.rain_prob).sum::<u64>()/len as u64;
+// 
+//         avg_out.push((start_time, avg_temp, avg_precip));
+//     }
+// 
+//     let start = avg_out[0].0;
+//     let dt = chrono::Duration::days(5);
+//     let avg_output = avg_out.into_iter().filter(|(d,_,_)| *d - start < dt).collect();
+//     let full_output = full_out.into_iter().filter(|(d,_,_)| *d - start < dt).collect();
+// 
+//     return (full_output, avg_output);
+// }
 
 
 pub fn create_weather_client(env_data: &EnvData) -> Client {

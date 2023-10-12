@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::thread;
 
+pub(crate) mod test_data;
 
 mod util;
 use util::*;
@@ -44,7 +45,7 @@ pub fn get_output_path() -> PathBuf {
 
 pub struct DisplayData {
     current_weather: CurrentWeather,
-    avg_forecast: AvgForecast,
+    forecast: Forecast5Day,
     todoist_tasks: Vec<Task>,
 }
 
@@ -97,12 +98,12 @@ fn parse_data(tx: SyncSender<DisplayData>, current_weather_json: String, hourly_
         .unwrap();
     let todoist_tasks = parse_tasks(&tasks_json);
     let current_weather = parse_current_weather(&current_weather_json);
-    let forecast = parse_hourly_forecast(&hourly_forecast_json);
-    let avg_forecast = gather_5day_forecast(&forecast);
+    let full_forecast = parse_hourly_forecast(&hourly_forecast_json);
+    let forecast = Forecast5Day::new(&full_forecast);
 
     let data = DisplayData {
         current_weather,
-        avg_forecast,
+        forecast,
         todoist_tasks,
     };
     tx.send(data).unwrap();

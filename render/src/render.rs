@@ -3,7 +3,7 @@
 use crate::DisplayData;
 use crate::draw::*;
 
-use chrono::Duration;
+use chrono::{Duration, Datelike};
 
 use image::{RgbImage, Rgb};
 
@@ -37,16 +37,12 @@ pub fn render(local_timezone: chrono_tz::Tz, display_data: DisplayData) -> (EInk
 
 
     let current_weather = display_data.current_weather;
-    let avg_forecast = display_data.avg_forecast;
+    let forecast = display_data.forecast;
     let todoist_tasks = display_data.todoist_tasks;
 
-    let fiveday = draw_5day_graph(&avg_forecast, graph_width, graph_height, &font);
-    let min_temp = avg_forecast.iter()
-        .min_by_key(|(_, t, _)| t).expect("no values in forecast")
-        .1;
-    let max_temp = avg_forecast.iter()
-        .max_by_key(|(_, t, _)| t).expect("no values in forecast")
-        .1;
+    let fiveday = draw_5day_graph(&forecast, graph_width, graph_height, &font);
+    let (min_temp, max_temp) = forecast.week_minmax_temps();
+    let daily_temps = forecast.daily_minmax_temps();
 
     let mut image = RgbImage::from_fn(800, 480, |_, _| -> Rgb<u8> { Rgb([255u8, 255u8, 255u8]) });
 
@@ -57,18 +53,23 @@ pub fn render(local_timezone: chrono_tz::Tz, display_data: DisplayData) -> (EInk
     let temp_text = format!("{}°", current_weather.temp_f);
 
     let current_time = chrono::Utc::now().with_timezone(&local_timezone);
+    let (today_low, today_high) = daily_temps[&current_time.day()];
+    let today_temps_text = format!("{}° {}°", today_high, today_low);
     let time_text = format!("{}", current_time.format("%-m/%-d  %-I%P"));
 
     let (temp_width, temp_height) = measure_text(&font, &temp_text, temp_size);
     let desc_x = temp_x + temp_width + 10.0;
     let desc_y = temp_y + temp_height/2.0;
 
+    let today_temps_x = temp_x + temp_width + 20.0;
+    let today_temps_y = 10.0;
 
     let mintext = min_temp.to_string();
     let maxtext = max_temp.to_string();
 
     draw_text_left(&mut image, &temp_text, temp_x, temp_y, &font, temp_size);
     draw_text_left(&mut image, &current_weather.description, desc_x, desc_y, &font, 50.0);
+    draw_text_left(&mut image, &today_temps_text, today_temps_x, today_temps_y, &font, 36.0);
     draw_text_right(&mut image, &time_text, 790.0, 10.0, &font, 36.0, black);
     draw_text_right(&mut image, &maxtext, graph_text_x, graph_text_y, &font, 24.0, red);
     draw_text_bottom_right(&mut image, &mintext, graph_text_x, graph_text_y+graph_height as f32, &font, 24.0, red);
