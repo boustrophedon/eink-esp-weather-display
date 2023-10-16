@@ -69,7 +69,7 @@ impl Forecast5Day {
             if t < day_min && d.hour() > 12 {
                 day_min = t;
             }
-            else if t > day_max {
+            if t > day_max {
                 day_max = t;
             }
         }
