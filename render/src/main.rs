@@ -3,7 +3,7 @@ use std::io::prelude::*;
 
 use std::path::PathBuf;
 
-use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::mpsc::sync_channel;
 use std::thread;
 
 pub(crate) mod test_data;
@@ -51,27 +51,28 @@ pub struct DisplayData {
     todoist_tasks: Vec<Task>,
 }
 
-fn gather_data(env_data: &EnvData, tx: SyncSender<(String, String, String)>) {
+/// Returns (current_weather_json, hourly_weather_json, tasks_json)
+fn gather_data(env_data: &EnvData) -> (String, String, String) {
     extrasafe::SafetyContext::new()
         // Allow reading for DNS/SSL certificates
         .enable(
             extrasafe::builtins::SystemIO::nothing()
-            .allow_open_readonly()
-            .allow_read()
-            .allow_close()
-            .allow_metadata()
+                .allow_open_readonly()
+                .allow_read()
+                .allow_close()
+                .allow_metadata()
             ).unwrap()
         // Allow opening tcp sockets for http requests
         // Allow opening udp socket for DNS unfortunately
         .enable(
             extrasafe::builtins::Networking::nothing()
-            .allow_start_tcp_clients()
-            .allow_start_udp_servers().yes_really()
+                .allow_start_tcp_clients()
+                .allow_start_udp_servers().yes_really()
             ).unwrap()
         // Enable threading for reqwest blocking mode
         .enable(
             extrasafe::builtins::danger_zone::Threads::nothing()
-            .allow_create()
+                .allow_create()
             ).unwrap()
         .apply_to_current_thread()
         .unwrap();
@@ -85,16 +86,16 @@ fn gather_data(env_data: &EnvData, tx: SyncSender<(String, String, String)>) {
     let current_weather_json = get_current_weather(&env_data, &client);
     let hourly_forecast_json = get_hourly_forecast(&env_data, &client);
 
-    tx.send((current_weather_json, hourly_forecast_json, tasks_json)).unwrap();
+    (current_weather_json, hourly_forecast_json, tasks_json)
 }
 
-fn parse_data(tx: SyncSender<DisplayData>, current_weather_json: String, hourly_forecast_json: String, tasks_json: String) {
+fn parse_data(current_weather_json: String, hourly_forecast_json: String, tasks_json: String) -> DisplayData {
     // start a new context for parsing the json
     extrasafe::SafetyContext::new()
         .enable(
             extrasafe::builtins::SystemIO::nothing()
-            .allow_stdout()
-            .allow_stderr()
+                .allow_stdout()
+                .allow_stderr()
             ).unwrap()
         .apply_to_current_thread()
         .unwrap();
@@ -103,12 +104,11 @@ fn parse_data(tx: SyncSender<DisplayData>, current_weather_json: String, hourly_
     let full_forecast = parse_hourly_forecast(&hourly_forecast_json);
     let forecast = Forecast5Day::new(&full_forecast);
 
-    let data = DisplayData {
+    DisplayData {
         current_weather,
         forecast,
         todoist_tasks,
-    };
-    tx.send(data).unwrap();
+    }
 }
 
 fn main() {
@@ -122,37 +122,50 @@ fn main() {
     let mut output_data_file = File::create(&output_filepath).expect("failed to create file");
     let mut output_image_file = File::create(&output_filepath.with_extension("png")).expect("failed to create file");
 
+    // I'm basically doing a state machine manually here so technically this would be a good place
+    // for async. I think it would be better to just build this into extrasafe somehow.
+    let (parse_start, parse_start_rx) = sync_channel::<()>(0);
+
     let (json_sender, json_receiver) = sync_channel(1);
     let (data_sender, data_receiver) = sync_channel(1);
 
+    let display_data: DisplayData;
+
     let use_debug_data = false;
-    let display_data = if !use_debug_data {
+    if !use_debug_data {
         let env_data = env_data.clone();
-        thread::spawn(move || gather_data(&env_data, json_sender));
-        let (current_weather_json, hourly_weather_json, tasks_json) = json_receiver.recv()
-            .expect("failed to get json");
+        thread::spawn(move || {
+            parse_start_rx.recv().unwrap();
+            let data = gather_data(&env_data);
+            json_sender.send(data).unwrap();
+        });
 
-        thread::spawn(move || parse_data(data_sender, current_weather_json, hourly_weather_json, tasks_json));
+        thread::spawn(move || {
+            let (current_weather_json, hourly_weather_json, tasks_json) = json_receiver.recv()
+                .expect("failed to get json");
+            let display_data = parse_data(current_weather_json, hourly_weather_json, tasks_json);
+            data_sender.send(display_data).unwrap();
+        });
 
-        data_receiver.recv()
-            .expect("failed to get data")
     }
     else {
-        get_test_data()
-    };
+        data_sender.send(get_test_data()).unwrap();
+    }
 
     extrasafe::SafetyContext::new()
         .enable(
             extrasafe::builtins::SystemIO::nothing()
-            .allow_stdout()
-            .allow_stderr()
-            .allow_file_write(&output_data_file)
-            .allow_file_write(&output_image_file)
-            .allow_close()
+                .allow_stdout()
+                .allow_stderr()
+                .allow_file_write(&output_data_file)
+                .allow_file_write(&output_image_file)
+                .allow_close()
             ).unwrap()
         .apply_to_current_thread()
         .unwrap();
-
+    parse_start.send(()).expect("failed to start json thread");
+    display_data = data_receiver.recv()
+            .expect("failed to get data");
 
     let (buffer, image) = render(env_data.local_timezone, display_data);
 
