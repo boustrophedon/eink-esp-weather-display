@@ -14,7 +14,9 @@ pub(crate) fn get_test_data() -> DisplayData {
     let full_forecast = test_data1();
     let forecast = Forecast5Day { full_forecast };
 
-    let today = chrono::offset::Local::now().date_naive();
+    let today = chrono::DateTime::parse_from_rfc3339("2023-10-16T20:30:00-04:00").unwrap()
+        .with_timezone(&chrono_tz::Tz::America__New_York)
+        .date_naive();
     let yesterday = today - Duration::days(1);
     let tomorrow = today + Duration::days(1);
     let todoist_tasks = vec![Task { description: "test task".into(), due_date: today },

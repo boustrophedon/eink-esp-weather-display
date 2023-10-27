@@ -167,7 +167,8 @@ fn main() {
     display_data = data_receiver.recv()
             .expect("failed to get data");
 
-    let (buffer, image) = render(env_data.local_timezone, display_data);
+    let current_time = chrono::Utc::now().with_timezone(&env_data.local_timezone);
+    let (buffer, image) = render(current_time, display_data);
 
     println!("image file {:?}", image.write_to(&mut output_image_file, image::ImageOutputFormat::Png));
 

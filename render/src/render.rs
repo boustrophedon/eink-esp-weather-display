@@ -3,7 +3,7 @@
 use crate::DisplayData;
 use crate::draw::*;
 
-use chrono::{Duration, Datelike};
+use chrono::{Datelike, DateTime, Duration};
 
 use image::{RgbImage, Rgb};
 
@@ -19,7 +19,7 @@ use epd_waveshare::buffer_len;
 
 pub type EInkBuffer = Vec<u8>;
 
-pub fn render(local_timezone: chrono_tz::Tz, display_data: DisplayData) -> (EInkBuffer, RgbImage) {
+pub fn render(current_time: DateTime<chrono_tz::Tz>, display_data: DisplayData) -> (EInkBuffer, RgbImage) {
     let white = image::Rgb([255u8, 255u8, 255u8]);
     let black = image::Rgb([0u8, 0u8, 0u8]);
     let red = image::Rgb([255u8, 0u8, 0u8]);
@@ -52,7 +52,6 @@ pub fn render(local_timezone: chrono_tz::Tz, display_data: DisplayData) -> (EInk
     let temp_size = 150.0;
     let temp_text = format!("{}°", current_weather.temp_f);
 
-    let current_time = chrono::Utc::now().with_timezone(&local_timezone);
     let (today_low, today_high) = daily_temps[&current_time.day()];
     let today_temps_text = format!("{}° {}°", today_high, today_low);
     let time_text = format!("{}", current_time.format("%-m/%-d  %-I%P"));
@@ -145,9 +144,10 @@ mod tests {
     fn test_render1() {
         let gold_master = include_bytes!("../tests/render_test1.png");
 
+        let current_time = chrono::DateTime::parse_from_rfc3339("2023-10-16T20:30:00-04:00").unwrap()
+            .with_timezone(&chrono_tz::Tz::America__New_York);
         let data = get_test_data();
-        let tz = "America/New_York".parse().unwrap();
-        let (buffer, image) = render(tz, data);
+        let (buffer, image) = render(current_time, data);
 
         // code to generate the initial file
         // use std::path::Path;
