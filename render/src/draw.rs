@@ -78,9 +78,9 @@ pub fn draw_5day_graph(forecast: &Forecast5Day,
         let p1 = w[0].1;
         let p2 = w[1].1;
         for (x, y) in BresenhamLineIter::new(p1, p2) {
-            let x = x as usize;
-            let y = y as u32;
-            
+            let x = x.max(0).min((width - 1.0) as i32) as usize;
+            let y = y.max(0).min((height - 1.0) as i32) as u32;
+
             if max_y[x].is_none() || max_y[x].filter(|ym| y > *ym).is_some() {
                 max_y[x] = Some(y);
             }
