@@ -10,7 +10,7 @@ edition = "2021"
 reqwest = { version = "^0.11", features = ["blocking",] }
 chrono = "^0.4"
 chrono-tz = "^0.8"
-extrasafe = "^0.1.4"
+extrasafe = { version = "^0.4", features = ["landlock",] }
 serde_json = "^1"
 image = "^0.24"
 imageproc = "^0.23"

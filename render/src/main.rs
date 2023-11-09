@@ -54,13 +54,10 @@ pub struct DisplayData {
 /// Returns (current_weather_json, hourly_weather_json, tasks_json)
 fn gather_data(env_data: &EnvData) -> (String, String, String) {
     extrasafe::SafetyContext::new()
-        // Allow reading for DNS/SSL certificates
         .enable(
             extrasafe::builtins::SystemIO::nothing()
-                .allow_open_readonly()
-                .allow_read()
-                .allow_close()
-                .allow_metadata()
+                .allow_dns_files()
+                .allow_ssl_files()
             ).unwrap()
         // Allow opening tcp sockets for http requests
         // Allow opening udp socket for DNS unfortunately
